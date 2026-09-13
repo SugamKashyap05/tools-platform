@@ -1,0 +1,28 @@
+{
+  "name": "@repo/auth",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "26.4.1",
+    "eslint": "10.9.1",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "better-auth": "1.0.0"
+  }
+}
