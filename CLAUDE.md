@@ -1,73 +1,82 @@
-# tools-platform
+# CLAUDE.md
 
-## Overview
+This file documents the platform conventions for the Hermes agent when working on the tools-platform repository.
 
-`tools-platform` is an npm-workspaces monorepo orchestrated by Turborepo. It provides the
-shared application and package skeleton for the web UI, API, authentication, UI primitives,
-and the contract used by every tool under `tools/`.
+## Repository Layout
 
-The repository is deliberately scaffold-only at this phase. `tools/` is empty and no
-production tool implementation is included.
+The repository is a Turborepo monorepo with the following structure:
 
-## Architecture
+- `apps/`: Contains web applications (e.g., `web`, `api`)
+- `packages/`: Contains shared packages (e.g., `ui`, `auth`, `tool-sdk`, `eslint-config`, `typescript-config`)
+- `tools/`: Contains tool implementations (each tool is a separate directory under `tools/`)
 
-- `apps/web/` — Next.js web application (`next`, React, and React DOM).
-- `apps/api/` — TypeScript API application using `tsx` and Hono; it depends on `@repo/auth`
-  and `@repo/tool-sdk`.
-- `packages/ui/` — React UI package with source exports under `src/`.
-- `packages/auth/` — authentication package with a `better-auth` dependency and a compiled
-  `dist/` entry point.
-- `packages/tool-sdk/` — TypeScript contract package. `src/index.ts` defines `ToolManifest`
-  and `ToolEntryPoint`; `src/manifest.ts` re-exports those types and the runtime guards.
-- `packages/eslint-config/` — shared ESLint configuration.
-- `packages/typescript-config/` — shared TypeScript configuration presets.
-- `tools/` — reserved for future tool implementations; currently empty.
-- `turbo.json` — Turborepo task graph for build, dev, lint, and type-check tasks.
+### Tool SDK Contract
 
-Internal packages use the `@repo/*` scope and are linked through the root `workspaces`
-configuration.
+The `@repo/tool-sdk` package provides the contract for tool development.
 
-## Key commands
+#### Tool Manifest
 
-Run these from the repository root:
+Every tool must declare a manifest in its `package.json` or via a `manifest.ts` file. The manifest shape is defined in `packages/tool-sdk/src/index.ts`:
 
-```bash
-npm install          # install/link all workspace dependencies
-npm run dev          # start all persistent workspace dev tasks
-npm run build        # build all workspaces through Turbo
-npm run lint         # lint all workspaces through Turbo
-npm run check-types  # type-check all workspaces through Turbo
-npm run format       # format TypeScript, TSX, and Markdown files with Prettier
+```typescript
+export interface ToolManifest {
+  name: string;          // Unique tool identifier, kebab-case
+  label: string;         // Human-readable label for UI
+  description: string;   // Short description shown on the tool card
+  icon: string;          // Path relative to the tool root, e.g. "./icon.svg"
+  route: string;         // URL route the tool is mounted at, e.g. "/tools/url-shortener"
+  quotaHook: string;     // Stub hook for free-tier quota enforcement (no-op today)
+  tags?: string[];       // Optional: tags for discovery
+  enabled?: boolean;     // Optional: whether the tool is enabled (default true)
+}
 ```
 
-There is no test script yet. Until tests are introduced, use `npm run check-types` and
-`npm run lint` as the baseline verification commands; package-level test scripts should be
-added with the first testable implementation.
+#### Tool Entry Point
 
-## Code standards
+Every tool must export an object conforming to the `ToolEntryPoint` interface from its main module:
 
-- Use two spaces for indentation in JSON, Markdown, TypeScript, JavaScript, and config files.
-- Use double quotes in JSON and single quotes in TypeScript/JavaScript strings.
-- Use semicolons in TypeScript and JavaScript.
-- Use `kebab-case` for directories, tool names, routes, and commit task prefixes; use
-  `camelCase` for variables/functions and `PascalCase` for types/interfaces.
-- Name tool entry files `src/index.ts` unless a package's public exports require a more
-  specific module name.
-- Keep public TypeScript functions typed, enable strict checking, avoid `any`, and prefer
-  explicit return types for exported functions.
-- Keep package boundaries intact: import shared code through workspace package exports, not
-  through relative paths that cross package boundaries.
-- Do not use wildcard imports or default exports unless the package's public API requires
-  them.
-- Keep `console` usage to warnings and errors; ordinary logging belongs in the platform
-  logger once one is introduced.
-- Keep commits scoped to one logical change. Commit messages use the form
-  `PHASEn-NNN: concise subject` for phased work.
-- Do not commit `node_modules/`, `.turbo/`, `dist/`, `.next/`, `coverage/`, logs, or the
-  temporary `phase1-*.md` prompt files.
+```typescript
+export interface ToolEntryPoint {
+  manifest: ToolManifest;
+  init(): Promise<void> | void;   // Called once at server startup
+  render(): unknown;              // Called when the tool's route is hit
+  dispose?(): Promise<void> | void; // Optional: cleanup on shutdown
+}
+```
 
-## Working conventions
+#### Type Guards
 
-Quote Windows paths containing spaces in shell commands. Run commands from the repository
-root unless a package script explicitly requires package-local execution. Do not add tool
-logic while a task is scaffold-only.
+The SDK provides `isToolManifest` and `isToolEntryPoint` for runtime validation.
+
+### Development Workflow
+
+1. Create a new tool directory under `tools/` (e.g., `tools/my-tool`).
+2. Add a `package.json` with the tool's name and dependencies.
+3. Implement the `ToolEntryPoint` in a `src/index.ts` (or similar) and export it.
+4. Ensure the tool's `package.json` includes the necessary exports for the SDK to load the manifest and entry point.
+5. Build the tool with `tsc` (if using TypeScript) and ensure the output is in the `dist` directory.
+
+### Platform Conventions
+
+- Use TypeScript for all new code.
+- Follow the ESLint configuration in `@repo/eslint-config`.
+- Use the TypeScript configuration in `@repo/typescript-config`.
+- All tools must be registered with the platform via the manifest and entry point contract.
+- The `quotaHook` is a placeholder for future quota enforcement; currently, it can be any string (e.g., `"noop"`).
+
+### Ignore Rules
+
+The `.gitignore` file includes rules for:
+- Node modules and build outputs
+- Environment variables
+- IDE files
+- Turbo cache and logs
+
+## Committing and Pushing
+
+After making changes, run:
+```bash
+git add .
+git commit -m "feat: initial commit of Phase 1 - monorepo scaffold and tool-sdk contract"
+git push origin master
+```
