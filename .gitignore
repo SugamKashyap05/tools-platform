@@ -33,3 +33,5 @@ phase1-*.md
 **/dist/**
 **/build/**
 **/coverage/**
+# ECC directory (local use only)
+.ecc/
